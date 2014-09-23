@@ -1091,5 +1091,9 @@ struct edict_s
 	// common data blocks
 	moveinfo_t		moveinfo;
 	monsterinfo_t	monsterinfo;
+
+	// add my custom mod data here
+	int rocket_life;
+	vec3_t target_offset;
 };
 

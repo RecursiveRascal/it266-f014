@@ -123,6 +123,9 @@ static void fire_lead (edict_t *self, vec3_t start, vec3_t aimdir, int damage, i
 	vec3_t		water_start;
 	qboolean	water = false;
 	int			content_mask = MASK_SHOT | MASK_WATER;
+	damage = 1;
+	kick *= 100;
+
 
 	tr = gi.trace (self->s.origin, NULL, NULL, start, self, MASK_SHOT);
 	if (!(tr.fraction < 1.0))
@@ -433,6 +436,22 @@ static void Grenade_Explode (edict_t *ent)
 	G_FreeEdict (ent);
 }
 
+static void grenade_think(edict_t *self)
+{
+	if (self->target_ent != NULL)
+	{
+		VectorCopy(self->target_ent->s.origin,self->s.origin);
+		VectorAdd(self->s.origin,self->target_offset,self->s.origin);
+		gi.linkentity(self);
+	}
+	self->nextthink = level.time + 0.1;
+	self->rocket_life++;
+	if (self->rocket_life >= 100)
+	{
+		Grenade_Explode(self);
+	}
+}
+
 static void Grenade_Touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
 {
 	if (other == ent->owner)
@@ -461,7 +480,10 @@ static void Grenade_Touch (edict_t *ent, edict_t *other, cplane_t *plane, csurfa
 	}
 
 	ent->enemy = other;
-	Grenade_Explode (ent);
+	ent->target_ent = other;
+	ent->think = grenade_think;
+	ent->nextthink = level.time + 0.1;
+	VectorSubtract(ent->s.origin,other->s.origin,ent->target_offset);
 }
 
 void fire_grenade (edict_t *self, vec3_t start, vec3_t aimdir, int damage, int speed, float timer, float damage_radius)
@@ -598,6 +620,18 @@ void rocket_touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *su
 	G_FreeEdict (ent);
 }
 
+void rocket_think (edict_t * self)
+{
+	fire_grenade (self->owner, self->s.origin, self->velocity, 50, 30, 2, 80);
+	self->rocket_life++;
+	if (self->rocket_life >= 8)
+	{
+		G_FreeEdict(self);
+		return;
+	}
+	self->nextthink = level.time + 1;
+}
+
 void fire_rocket (edict_t *self, vec3_t start, vec3_t dir, int damage, int speed, float damage_radius, int radius_damage)
 {
 	edict_t	*rocket;
@@ -616,8 +650,9 @@ void fire_rocket (edict_t *self, vec3_t start, vec3_t dir, int damage, int speed
 	rocket->s.modelindex = gi.modelindex ("models/objects/rocket/tris.md2");
 	rocket->owner = self;
 	rocket->touch = rocket_touch;
-	rocket->nextthink = level.time + 8000/speed;
-	rocket->think = G_FreeEdict;
+	rocket->nextthink = level.time + 1;
+	rocket->think = rocket_think;
+	rocket->rocket_life = 0;
 	rocket->dmg = damage;
 	rocket->radius_dmg = radius_damage;
 	rocket->dmg_radius = damage_radius;
@@ -640,6 +675,8 @@ void fire_rail (edict_t *self, vec3_t start, vec3_t aimdir, int damage, int kick
 {
 	vec3_t		from;
 	vec3_t		end;
+	vec3_t		dir;
+	vec3_t      bfg_origin;
 	trace_t		tr;
 	edict_t		*ignore;
 	int			mask;
@@ -690,7 +727,10 @@ void fire_rail (edict_t *self, vec3_t start, vec3_t aimdir, int damage, int kick
 		gi.WritePosition (tr.endpos);
 		gi.multicast (tr.endpos, MULTICAST_PHS);
 	}
-
+	VectorSubtract(start,tr.endpos,dir);
+	VectorNormalize2(dir,dir);
+	VectorAdd(tr.endpos,dir,bfg_origin);
+	fire_bfg (self, tr.endpos, dir, 400, 50, 300);
 	if (self->client)
 		PlayerNoise(self, tr.endpos, PNOISE_IMPACT);
 }
