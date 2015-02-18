@@ -588,6 +588,11 @@ but is called after each death and level change in deathmatch
 void InitClientPersistant (gclient_t *client)
 {
 	gitem_t		*item;
+	int max_mana;
+	float mana_regen;
+
+	max_mana = client->pers.max_mana;
+	mana_regen = client->pers.mana_regen;
 
 	memset (&client->pers, 0, sizeof(client->pers));
 
@@ -608,6 +613,11 @@ void InitClientPersistant (gclient_t *client)
 	client->pers.max_slugs		= 50;
 
 	client->pers.connected = true;
+
+	client->pers.max_mana = max_mana;
+	client->pers.mana_regen = mana_regen;
+
+	client->pers.mana = client->pers.max_mana * 0.5;
 }
 
 
@@ -1248,12 +1258,19 @@ deathmatch mode, so clear everything out before starting them.
 */
 void ClientBeginDeathmatch (edict_t *ent)
 {
+	gclient_t *client;
 	G_InitEdict (ent);
 
 	InitClientResp (ent->client);
 
 	// locate ent at a spawn point
 	PutClientInServer (ent);
+	
+	client = ent->client;
+	client->pers.mana = 0;
+	client->pers.max_mana = 50;
+	client->pers.mana_regen = 0.01;
+
 
 	if (level.intermissiontime)
 	{
@@ -1752,6 +1769,14 @@ void ClientBeginServerFrame (edict_t *ent)
 		return;
 
 	client = ent->client;
+
+	// updating mana levels
+	if (client->pers.mana < client->pers.max_mana)
+	{
+		client->pers.mana += client->pers.mana_regen;
+	}
+
+	gi.centerprintf(ent,"Mana: %.0f / %i\n",client->pers.mana,client->pers.max_mana);
 
 	if (deathmatch->value &&
 		client->pers.spectator != client->resp.spectator &&
