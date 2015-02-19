@@ -105,6 +105,42 @@ qboolean fire_hit (edict_t *self, vec3_t aim, int damage, int kick)
 }
 
 
+void fire_melee(edict_t *self, vec3_t start, vec3_t aimdir, int length, int kick, int damage, int mod)
+{
+	trace_t		tr;
+	vec3_t endpos;
+
+	tr = gi.trace (self->s.origin, NULL, NULL, start, self, MASK_SHOT);
+	// is there something between the player's origin and the start of the melee attack
+	if (tr.fraction == 1.0)
+	{
+		// it ok to do the attack
+		VectorMA(start,length,aimdir,endpos);
+		tr = gi.trace (start, NULL, NULL, endpos, self, MASK_SHOT);
+		if (tr.fraction < 1.0)
+		{
+			//we hit something
+			if (tr.ent->takedamage)
+			{
+				kick *= 1-tr.fraction;
+				damage *= tr.fraction;
+				T_Damage(tr.ent,self,self,aimdir,tr.endpos,tr.plane.normal,damage,kick,0,mod);
+			}
+		}
+	}
+	if (tr.fraction < 1.0)
+	{
+		gi.WriteByte (svc_temp_entity);
+		gi.WriteByte (TE_GUNSHOT);
+		gi.WritePosition (tr.endpos);
+		gi.WriteDir (tr.plane.normal);
+		gi.multicast (tr.endpos, MULTICAST_PVS);
+
+		if (self->client)
+			PlayerNoise(self, tr.endpos, PNOISE_IMPACT);
+	}
+}
+
 /*
 =================
 fire_lead
